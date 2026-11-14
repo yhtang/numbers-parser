@@ -551,7 +551,7 @@ class Table(Cacheable):
             return any(group.is_enabled for group in groups)
         except UnsupportedError:
             raise
-        except Exception as error:
+        except (AttributeError, LookupError, TypeError, ValueError) as error:
             raise UnsupportedError("table grouping state is unavailable") from error
 
     @property

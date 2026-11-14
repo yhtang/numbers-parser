@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from enum import IntEnum
 
 from numbers_parser.constants import OPERATOR_PRECEDENCE
+from numbers_parser.exceptions import UnsupportedError
 
 __all__ = [
     "xl_cell_to_rowcol",
@@ -68,6 +69,7 @@ class CellRange:
     from_table_id: int = None
     to_table_id: int = None
     range_type: CellRangeType = None
+    reject_named_references: bool = False
     _ref_error: bool = False
     _do_init: bool = True
     _table_names: list[str] = field(init=False, default=None, repr=False)
@@ -98,6 +100,11 @@ class CellRange:
     def expand_ref(self, ref: str, is_abs: bool = False, no_prefix=False) -> str:
         if self._ref_error:
             return "#REF!"
+
+        # Header display text can be indistinguishable from a literal or an
+        # unrelated reference. Refuse before discarding the scoped identity.
+        if self.reject_named_references and isinstance(ref, ScopedNameRef):
+            raise UnsupportedError("formula uses a named header reference")
 
         self.model.name_ref_cache.refresh()
         is_document_unique = (

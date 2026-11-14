@@ -737,6 +737,21 @@ class Cell(CellStorageFlags, Cacheable):
         return None
 
     @property
+    def formula_without_header_names(self) -> str | None:
+        """Return formula text only when header names are not used as references.
+
+        Raises ``UnsupportedError`` if a named row or column reference would
+        lose its identity when rendered as header text. Coordinate references
+        and literal values are unaffected.
+        """
+        if self._formula_id is not None:
+            table_formulas = self._model.table_formulas(self._table_id)
+            return table_formulas.formula(
+                self._formula_id, self.row, self.col, reject_named_references=True,
+            )
+        return None
+
+    @property
     def is_bulleted(self) -> bool:
         """bool: ``True`` if the cell contains text bullets."""
         return self._is_bulleted

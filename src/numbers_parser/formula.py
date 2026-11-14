@@ -11,10 +11,11 @@ FUNCTION_NAME_TO_ID = {v: k for k, v in FUNCTION_MAP.items()}
 
 
 class Formula(list):
-    def __init__(self, model, table_id, row, col) -> None:
+    def __init__(self, model, table_id, row, col, *, reject_named_references=False) -> None:
         self._stack = []
         self._model = model
         self._table_id = table_id
+        self._reject_named_references = reject_named_references
         self.row = row
         self.col = col
 
@@ -195,7 +196,9 @@ class Formula(list):
 
     def xref(self, *args) -> None:
         (row, col, node) = args
-        self.push(self._model.node_to_ref(self._table_id, row, col, node))
+        ref = self._model.node_to_ref(self._table_id, row, col, node)
+        ref.reject_named_references = self._reject_named_references
+        self.push(ref)
 
 
 NODE_FUNCTION_MAP = {
@@ -244,7 +247,7 @@ class TableFormulas:
             for k, v in TSCEArchives._ASTNODEARRAYARCHIVE_ASTNODETYPE.values_by_number.items()
         }
 
-    def formula(self, formula_key, row, col):
+    def formula(self, formula_key, row, col, *, reject_named_references=False):
         all_formulas = self._model.formula_ast(self._table_id)
         if formula_key not in all_formulas:
             table_name = self._model.table_name(self._table_id)
@@ -255,7 +258,8 @@ class TableFormulas:
             )
             return "INVALID_KEY!(" + str(formula_key) + ")"
 
-        formula = Formula(self._model, self._table_id, row, col)
+        formula = Formula(self._model, self._table_id, row, col,
+                          reject_named_references=reject_named_references)
         for node in all_formulas[formula_key]:
             node_type = self._formula_type_lookup[node.AST_node_type]
             if node_type == "REFERENCE_ERROR_WITH_UIDS":
