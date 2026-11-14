@@ -954,6 +954,8 @@ class _NumbersModel(Cacheable):
         if node.HasField("AST_cross_table_reference_extra_info"):
             table_uuid = NumbersUUID(node.AST_cross_table_reference_extra_info.table_id).hex
             to_table_id = self.table_uuids_to_id(table_uuid)
+            if to_table_id is None:
+                raise UnsupportedError("formula references an unavailable table")
         else:
             to_table_id = None
 
