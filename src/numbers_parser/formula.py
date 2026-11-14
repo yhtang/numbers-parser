@@ -1,5 +1,5 @@
-import re
 import warnings
+from decimal import Decimal
 from datetime import datetime, timedelta
 
 from numbers_parser.exceptions import UnsupportedWarning
@@ -265,19 +265,6 @@ class TableFormulas:
         return str(formula)
 
 
-def number_to_str(v: int) -> str:
-    """Format a float as a string."""
-    # Number is never negative; formula will use NEGATION_NODE
-    v_str = repr(v)
-    if "e" in v_str:
-        number, exp = v_str.split("e")
-        number = re.sub(r"[,-]", "", number)
-        num_zeroes = abs(int(exp)) - 1
-        if "." in number:
-            num_zeroes -= len(number.split(".")[1]) - 1
-            number = number.replace(".", "")
-        zeroes = "0" * num_zeroes
-        if int(exp) > 0:
-            return f"{number}{zeroes}"
-        return f"0.{zeroes}{number}"
-    return v_str
+def number_to_str(v: float) -> str:
+    """Render the observed float without losing its base-10 exponent."""
+    return format(Decimal(repr(v)), "f")
