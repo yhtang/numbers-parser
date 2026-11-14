@@ -29,6 +29,7 @@ from numbers_parser.constants import (
     MAX_ROW_COUNT,
 )
 from numbers_parser.containers import ItemsList
+from numbers_parser.exceptions import UnsupportedError
 from numbers_parser.model import _NumbersModel
 from numbers_parser.numbers_cache import Cacheable
 from numbers_parser.xrefs import xl_cell_to_rowcol, xl_range
@@ -526,6 +527,32 @@ class Table(Cacheable):
                     else:
                         cell = Cell._from_storage(table_id, row, col, buffer, model)
                 self._data[row].append(cell)
+
+    @property
+    def has_grouping(self) -> bool:
+        """Whether either stored category owner has an enabled grouping.
+
+        Raises ``UnsupportedError`` when the available owner records do not
+        establish their grouping state. Both modern and legacy owners are
+        checked so a missing or conflicting reference cannot hide grouping.
+        """
+        try:
+            table = self._model.objects[self._table_id]
+            groups = []
+            if table.HasField("category_owner_deprecated"):
+                groups.extend(table.category_owner_deprecated.group_by)
+            if table.HasField("category_owner") and table.category_owner.identifier:
+                owner = self._model.objects[table.category_owner.identifier]
+                if not owner.group_by:
+                    raise UnsupportedError("table grouping state is unavailable")
+                groups.extend(self._model.objects[entry.identifier] for entry in owner.group_by)
+            if not groups or any(not group.HasField("is_enabled") for group in groups):
+                raise UnsupportedError("table grouping state is unavailable")
+            return any(group.is_enabled for group in groups)
+        except UnsupportedError:
+            raise
+        except Exception as error:
+            raise UnsupportedError("table grouping state is unavailable") from error
 
     @property
     def name(self) -> str:
