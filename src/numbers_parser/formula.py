@@ -2,9 +2,10 @@ import warnings
 from decimal import Decimal
 from datetime import datetime, timedelta
 
-from numbers_parser.exceptions import UnsupportedWarning
+from numbers_parser.exceptions import UnsupportedError, UnsupportedWarning
 from numbers_parser.generated import TSCEArchives_pb2 as TSCEArchives
 from numbers_parser.generated.functionmap import FUNCTION_MAP
+from numbers_parser.xrefs import CellRange
 
 FUNCTION_NAME_TO_ID = {v: k for k, v in FUNCTION_MAP.items()}
 
@@ -163,15 +164,23 @@ class Formula(list):
         self.push(f"{arg1}^{arg2}")
 
     def range(self, *args) -> None:
-        arg2, arg1 = [str(x) for x in self.popn(2)]
-        func_range = "(" in arg1 or "(" in arg2
-        if "::" in arg1 and not func_range:
-            # Assumes references are not cross-table
-            arg1_parts = arg1.split("::")
-            arg2_parts = arg2.split("::")
-            self.push(f"{arg1_parts[0]}::{arg1_parts[1]}:{arg2_parts[1]}")
+        end, start = self.popn(2)
+        # Keep the resolved IDs until both endpoints have been checked.
+        # Comparing rendered names can conflate different tables, and erasing
+        # the second prefix can silently retarget a range.
+        if not isinstance(start, CellRange) or not isinstance(end, CellRange):
+            raise UnsupportedError("range endpoints cannot be identified")
+        if start._ref_error or end._ref_error or start.to_table_id != end.to_table_id:
+            raise UnsupportedError("range endpoints target different or unavailable tables")
+        left, right = str(start), str(end)
+        left_prefix, left_separator, left_cell = left.rpartition("::")
+        right_prefix, right_separator, right_cell = right.rpartition("::")
+        if left_separator or right_separator:
+            if not left_separator or not right_separator or left_prefix != right_prefix:
+                raise UnsupportedError("range endpoint names cannot be combined safely")
+            self.push(f"{left_prefix}::{left_cell}:{right_cell}")
         else:
-            self.push(f"{arg1}:{arg2}")
+            self.push(f"{left}:{right}")
 
     def string(self, *args) -> None:
         node = args[2]
